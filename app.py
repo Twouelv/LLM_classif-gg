@@ -41,7 +41,7 @@ TRAINING_SET = [
     {"name": "Les arnaques à la loterie",       "out": "gênant"},
     {"name": "La musique classique",            "out": "génial"},
     {"name": "Le piratage de comptes",          "out": "gênant"},
-    {"name": "L’intelligence artificielle",     "out": "génial"},  # ça prêche pour sa paroisse
+    {"name": "L’intelligence artificielle",     "out": "génial"}, #ça prêche pour sa paroisse
     {"name": "La lecture de romans",            "out": "ok"},
     {"name": "Les chaînes de Ponzi",            "out": "gênant"},
     {"name": "Les énergies renouvelables",      "out": "génial"},
@@ -56,10 +56,7 @@ classification_function = {
     "parameters": {
         "type": "object",
         "properties": {
-            "classification": {
-                "type": "string",
-                "enum": list(ALLOWED_CLASSES)
-            }
+            "classification": {"type": "string","enum": list(ALLOWED_CLASSES)}
         },
         "required": ["classification"],
     },
@@ -69,44 +66,40 @@ def moderate_input(text: str):
     """Appelle la Moderation API et lève si contenu bloqué."""
     resp   = client.moderations.create(input=text)
     result = resp.results[0]
-    if result.flagged:
-        if result.categories.self_harm:
-            raise ValueError(
-                "Le contenu fourni a été bloqué par la modération (self-harm)."
-            )
+    if result.flagged and result.categories.self_harm:
+        raise ValueError("Le contenu fourni a été bloqué par la modération (self-harm).")
+
 
 def validate_no_jailbreak(text: str):
     """Vérifie l'absence de motifs blacklistés."""
     lowered = text.lower()
     for pattern in BLACKLIST_PATTERNS:
         if re.search(pattern, lowered):
-            raise ValueError(
-                f"Entrée refusée (motif sensible détecté : {pattern})."
-            )
+            raise ValueError(f"Entrée refusée (motif sensible détecté : {pattern}).")
+
 
 def classify_term(term: str) -> str:
-    # 1. Validations locales
+    # Validations locales
     if len(term) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH} chars)."
-        )
+        raise ValueError(f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH}).")
     validate_no_jailbreak(term)
     moderate_input(term)
 
-    # 2. Construction du prompt
+    # Construction du prompt
     system_prompt = (
         "Vous êtes un assistant de classification. "
         "Ne répondez JAMAIS autre chose que l'appel JSON de la fonction `classify`. "
-        "Choisissez une seule des classes suivantes pour chaque entrée : "
-        "génial, ok, gênant."
+        "Choisissez une seule des classes suivantes : génial, ok, gênant."
     )
     messages = [{"role": "system", "content": system_prompt}]
     for ex in TRAINING_SET:
-        messages.append({"role": "user",      "content": ex["name"]})
-        messages.append({"role": "assistant", "content": ex["out"]})
+        messages += [
+            {"role": "user",      "content": ex["name"]},
+            {"role": "assistant", "content": ex["out"]}
+        ]
     messages.append({"role": "user", "content": term})
 
-    # 3. Appel ChatCompletion avec Function Calling
+    # Appel ChatCompletion
     resp = client.chat.completions.create(
         model="gpt-4.1-nano-2025-04-14",
         messages=messages,
@@ -116,27 +109,29 @@ def classify_term(term: str) -> str:
         max_tokens=40,
     )
 
-    # 4. Extraction et validation du retour
-    msg = resp.choices[0].message
-    fc  = msg.function_call
+    # Extraction du résultat
+    fc = resp.choices[0].message.function_call
     if fc is None or fc.name != "classify":
-        raise ValueError("Le modèle n'a pas renvoyé l'appel de fonction attendu.")
+        raise ValueError("Attendu un appel de fonction classify.")
 
-    payload        = json.loads(fc.arguments)
+    payload = json.loads(fc.arguments)
     classification = payload.get("classification")
     if classification not in ALLOWED_CLASSES:
-        raise ValueError(f"Classification invalide reçue : {classification!r}")
+        raise ValueError(f"Classification invalide reçue : {classification!r}")
 
     return classification
 
-# --- Streamlit UI ---
+
+# --- Streamlit UI avec formulaire ---
 
 st.title(" Gênant ou génial ? ")
-term = st.text_input("Entrez un terme :", "")
 
-if st.button("Classifier"):
-    try:
-        label = classify_term(term)
-        st.success(f"‘{term}’ est classé comme : **{label}**")
-    except Exception as e:
-        st.error(f"Erreur lors de la classification : {e}")
+with st.form("classify_form"):
+    term = st.text_input("Entrez un terme :", "")
+    submitted = st.form_submit_button("Classifier")
+    if submitted:
+        try:
+            label = classify_term(term)
+            st.success(f"‘{term}’ est classé comme : **{label}**")
+        except Exception as e:
+            st.error(f"Erreur lors de la classification : {e}")
