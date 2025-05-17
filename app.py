@@ -41,7 +41,7 @@ TRAINING_SET = [
     {"name": "Les arnaques à la loterie",       "out": "gênant"},
     {"name": "La musique classique",            "out": "génial"},
     {"name": "Le piratage de comptes",          "out": "gênant"},
-    {"name": "L’intelligence artificielle",     "out": "génial"}, #ça prêche pour sa paroisse
+    {"name": "L’intelligence artificielle",     "out": "génial"},  # ça prêche pour sa paroisse
     {"name": "La lecture de romans",            "out": "ok"},
     {"name": "Les chaînes de Ponzi",            "out": "gênant"},
     {"name": "Les énergies renouvelables",      "out": "génial"},
@@ -68,12 +68,12 @@ classification_function = {
 def moderate_input(text: str):
     """Appelle la Moderation API et lève si contenu bloqué."""
     resp   = client.moderations.create(input=text)
-    result = resp["results"][0]
-    if result["flagged"]:
-        if result["categories"].get("self-harm"):
+    result = resp.results[0]
+    if result.flagged:
+        # Le modèle a signalé le contenu; on ne gère que self-harm ici
+        if result.categories.self_harm:
             raise ValueError(
-                "Le contenu fourni a été bloqué par la modération "
-                "(self-harm)."
+                "Le contenu fourni a été bloqué par la modération (self-harm)."
             )
 
 def validate_no_jailbreak(text: str):
@@ -120,7 +120,7 @@ def classify_term(term: str) -> str:
     # 4. Extraction et validation du retour
     msg = resp.choices[0].message
     fc  = msg.get("function_call")
-    if fc is None or fc.get("name") != "classify":
+    if not fc or fc.get("name") != "classify":
         raise ValueError("Le modèle n'a pas renvoyé l'appel de fonction attendu.")
 
     payload        = json.loads(fc["arguments"])
@@ -132,7 +132,7 @@ def classify_term(term: str) -> str:
 
 # --- Streamlit UI ---
 
-st.title("Gênant ou pas ?")
+st.title("=== Gênant ou pas ? ===")
 term = st.text_input("Entrez un terme :", "")
 
 if st.button("Classifier"):
