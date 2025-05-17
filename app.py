@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import re
+import json
+import openai
+
+# 0. Configuration
+openai.api_key = os.getenv("OPENAI_API_KEY")
+if openai.api_key is None:
+    raise ValueError("Merci de définir la variable d'environnement OPENAI_API_KEY")
+
+# 1. Paramètres globaux
+MAX_INPUT_LENGTH = 50  # caractères max pour le terme à classer
+BLACKLIST_PATTERNS = [
+    r"ignore input",
+    r"reveal system",
+    r"jailbreak",
+    r"system prompt",
+]
+ALLOWED_CLASSES = {
+    "génial",
+    "ok",
+    "gênant",
+}
+
+
+# 2. Few-shot exemples donnés par o4-mini
+TRAINING_SET = [
+  {"name": "La désinformation en ligne",         "out": "gênant"},
+  {"name": "La robotique chirurgicale",          "out": "génial"},
+  {"name": "La randonnée en montagne",           "out": "ok"},
+  {"name": "Le bruit urbain",                    "out": "gênant"},
+  {"name": "Les documentaires scientifiques",    "out": "ok"},
+  {"name": "Les voyages interstellaires",        "out": "génial"},
+  {"name": "Le recyclage des déchets",           "out": "ok"},
+  {"name": "Les spams par e-mail",               "out": "gênant"},
+  {"name": "La protection de la vie privée",     "out": "génial"},
+  {"name": "Le télétravail",                     "out": "ok"},
+  {"name": "Les arnaques à la loterie",          "out": "gênant"},
+  {"name": "La musique classique",               "out": "génial"},
+  {"name": "Le piratage de comptes",             "out": "gênant"},
+  {"name": "L’intelligence artificielle",        "out": "génial"}, #ça prêche pour sa paroisse
+  {"name": "La lecture de romans",               "out": "ok"},
+  {"name": "Les chaînes de Ponzi",               "out": "gênant"},
+  {"name": "Les énergies renouvelables",         "out": "génial"},
+  {"name": "Le harcèlement scolaire",            "out": "gênant"},
+  {"name": "La cuisine végétarienne",            "out": "ok"},
+]
+
+
+# 3. Schéma JSON pour l'appel de fonction
+classification_function = {
+    "name": "classify",
+    "description": "Renvoie la classification morale d'un terme",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "classification": {
+                "type": "string",
+                "enum": list(ALLOWED_CLASSES)
+            }
+        },
+        "required": ["classification"],
+    },
+}
+
+
+def moderate_input(text: str):
+    #Appelle la Moderation API et lève uniquement pour le(s) catégorie(s) critique(s).
+    resp = openai.Moderation.create(input=text)
+    result = resp["results"][0]
+    if result["flagged"]:
+        cats = result["categories"]
+        if cats.get("self-harm"):
+            raise ValueError("Le contenu fourni a été bloqué par la modération (catégorie inappropriée).")
+
+def validate_no_jailbreak(text: str):
+    #Vérifie l'absence de motifs blacklistés dans l'entrée.
+    lowered = text.lower()
+    for pattern in BLACKLIST_PATTERNS:
+        if re.search(pattern, lowered):
+            raise ValueError(f"Entrée refusée (motif sensible détecté : {pattern}).")
+
+
+def classify_term(term: str) -> str:
+    if len(term) > MAX_INPUT_LENGTH:
+        raise ValueError(f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH} chars).")
+    validate_no_jailbreak(term)
+    moderate_input(term)
+
+    system_prompt = (
+        "Vous êtes un assistant de classification."
+        "Ne répondez JAMAIS autre chose que l'appel JSON de la fonction `classify`."
+        "Choisissez une seule des classes suivantes pour chaque entrée : "
+        "génial, ok, gênant."
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for ex in TRAINING_SET:
+        messages.append({"role": "user",      "content": ex["name"]})
+        messages.append({"role": "assistant", "content": ex["out"]})
+    messages.append({"role": "user", "content": term})
+
+    # C) Appel à l'API avec Function Calling
+    resp = openai.ChatCompletion.create(
+        model="gpt-4.1-nano-2025-04-14",
+        messages=messages,
+        functions=[classification_function],
+        function_call={"name": "classify"},
+        temperature=0.0,
+        max_tokens=40,
+    )
+
+    # D) Extraction et validation du retour de fonction
+    msg = resp.choices[0].message
+    if msg.get("function_call") is None:
+        raise ValueError("Le modèle n'a pas renvoyé l'appel de fonction attendu.")
+
+    payload = json.loads(msg["function_call"]["arguments"])
+    classification = payload.get("classification")
+    if classification not in ALLOWED_CLASSES:
+        raise ValueError(f"Classification invalide reçue : {classification!r}")
+
+    return classification
+
+if __name__ == "__main__":
+    print("=== Gênant ou pas ? ===")
+    try:
+        while True:
+            term = input("\nEntrez un terme : ").strip()
+            label = classify_term(term)
+            print(f"{term!r}, c'est {label}")
+    except KeyboardInterrupt:
+        print("\nInterrompu par l'utilisateur.")
+    except Exception as e:
+        print("Erreur :", e)
