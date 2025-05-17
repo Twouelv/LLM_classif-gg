@@ -160,40 +160,37 @@ placeholders = [
     "Ex: Une appli pour parler à son moi du passé",
 ]
 
-# Session state pour afficher/masquer le résultat
+# Session state pour afficher/masquer le résultat et le vote
 if 'show_result' not in st.session_state:
     st.session_state.show_result = False
+if 'voted' not in st.session_state:
+    st.session_state.voted = False
 
 # Formulaire de saisie
 with st.form("classify_form"):
     term = st.text_input("", placeholder=random.choice(placeholders), label_visibility='hidden')
     submitted = st.form_submit_button("Go")
     if submitted:
+        # Réinitialiser l'état de vote à chaque nouvelle entrée
         st.session_state.show_result = True
+        st.session_state.voted = False
         st.session_state.term = term
         try:
             st.session_state.label = classify_term(term)
         except Exception as e:
             st.error(f"Erreur : {e}")
 
-# Résultat et boutons de vote
+# Affichage du résultat
 if st.session_state.show_result:
     t = st.session_state.term
     l = st.session_state.label
     st.markdown(f"<h2 style='font-size:36px;text-align:center;'>{t}, c'est {l}</h2>", unsafe_allow_html=True)
-    # Colonnes pour boutons larges
-    c1, c2 = st.columns(2, gap='large')
-    if c1.button("D'accord 👍"):
-        record_vote(t, 1)
-        # Cacher le résultat après vote
-        st.session_state.show_result = False
-        del st.session_state['term']
-        del st.session_state['label']
-        st.experimental_rerun()
-    if c2.button("Pas d'accord 👎"):
-        record_vote(t, 0)
-        # Cacher le résultat après vote
-        st.session_state.show_result = False
-        del st.session_state['term']
-        del st.session_state['label']
-        st.experimental_rerun()
+    # Si l'utilisateur n'a pas encore voté, afficher les boutons
+    if not st.session_state.voted:
+        c1, c2 = st.columns(2, gap='large')
+        if c1.button("D'accord 👍"):
+            record_vote(t, 1)
+            st.session_state.voted = True
+        if c2.button("Pas d'accord 👎"):
+            record_vote(t, 0)
+            st.session_state.voted = True
