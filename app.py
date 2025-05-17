@@ -130,7 +130,7 @@ st.markdown(
 # Titre
 st.markdown("<h1 style='font-size:48px; text-align:center;'>Génial ou gênant ?</h1>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align:center;color:#333; font-size:20px; margin-top:0;'>"
+    "<p style='text-align:center;color:#555; font-size:20px; margin-top:0;'>"
     "Elle a vu. Elle sait. Elle répond. Voici le jugement de l’intelligence artificielle."
     "</p>"
     +
