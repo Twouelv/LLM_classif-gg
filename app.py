@@ -121,17 +121,24 @@ def classify_term(term: str) -> str:
 
     return classification
 
-
 # --- Streamlit UI avec formulaire ---
 
-st.title(" Gênant ou génial ? ")
+# Style global pour titre et résultats
+st.markdown("<style>\nbody {background-color: #fff;}\n.css-18e3th9 {padding: 2rem;}\n</style>", unsafe_allow_html=True)
+# Titre principal agrandi
+st.markdown("<h1 style='font-size:48px; text-align:center; margin-bottom:0.2em;'>Gênant ou génial ?</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color: #666; margin-top:0;'>L'intelligence artificielle a la réponse</p>", unsafe_allow_html=True)
 
 with st.form("classify_form"):
-    term = st.text_input("Entrez un terme :", "")
-    submitted = st.form_submit_button("Classifier")
+    term = st.text_input("Entrez un terme :", "", placeholder="Ex: Les bananes")
+    submitted = st.form_submit_button("Go")
     if submitted:
         try:
             label = classify_term(term)
-            st.success(f"‘{term}’ est classé comme : **{label}**")
+            # Affichage du résultat en gros texte
+            st.markdown(
+                f"<h2 style='font-size:36px; text-align:center;'>{term}, c'est {label}</h2>",
+                unsafe_allow_html=True
+            )
         except Exception as e:
-            st.error(f"Erreur lors de la classification : {e}")
+            st.markdown(f"<p style='text-align:center; color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
