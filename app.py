@@ -127,7 +127,7 @@ def classify_term(term: str) -> str:
 # CSS boutons larges côte à côte
 st.markdown(
     "<style>"
-    "div.stButton > button { width: 90%; margin: 0 auto; padding: 1rem; font-size: 1rem; }"
+    "div.stButton > button { width: 100%; padding: 1rem; font-size: 1rem; }"
     "</style>",
     unsafe_allow_html=True
 )
@@ -151,7 +151,7 @@ placeholders = [
     "Ex: Une appli de méditation avec la voix de Jacques Cheminade",
     "Ex: Un CV en format carte Yu-Gi-Oh",
     "Ex: Le silence est une forme de leadership",
-    "Ex: Un chatbot qui simule ton psy, ton ex et ta daronne en même temps",
+    "Ex: Une chatbot qui simule ton psy, ton ex et ta daronne en même temps",
     "Ex: Une app qui t'applaudit quand tu respires",
     "Ex: Une app pour gérer ta rupture éthiquement",
     "Ex: Une IA qui t’envoie des ‘bravo’ aléatoires",
@@ -181,11 +181,19 @@ if st.session_state.show_result:
     t = st.session_state.term
     l = st.session_state.label
     st.markdown(f"<h2 style='font-size:36px;text-align:center;'>{t}, c'est {l}</h2>", unsafe_allow_html=True)
-    # Colonnes pour boutons
+    # Colonnes pour boutons larges
     c1, c2 = st.columns(2, gap='large')
     if c1.button("D'accord 👍"):
         record_vote(t, 1)
+        # Cacher le résultat après vote
         st.session_state.show_result = False
+        del st.session_state['term']
+        del st.session_state['label']
+        st.experimental_rerun()
     if c2.button("Pas d'accord 👎"):
         record_vote(t, 0)
+        # Cacher le résultat après vote
         st.session_state.show_result = False
+        del st.session_state['term']
+        del st.session_state['label']
+        st.experimental_rerun()
