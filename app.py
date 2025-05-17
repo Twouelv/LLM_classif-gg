@@ -158,20 +158,23 @@ placeholders = [
 ]
 
 # Formulaire
+submitted = False
 with st.form("classify_form"):
     term = st.text_input("", placeholder=random.choice(placeholders), label_visibility='hidden')
     submitted = st.form_submit_button("Go")
-    if submitted:
-        try:
-            label = classify_term(term)
-            st.markdown(
-                f"<h2 style='font-size:36px;text-align:center;'>{term}, c'est {label}</h2>",
-                unsafe_allow_html=True
-            )
-            # Boutons de vote (stockés en privé, sans affichage de stats)
-            if st.button("D'accord 👍"):
-                record_vote(term, 1)
-            if st.button("Pas d'accord 👎"):
-                record_vote(term, 0)
-        except Exception as e:
-            st.markdown(f"<p style='text-align:center;color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
+
+if submitted:
+    try:
+        label = classify_term(term)
+        st.markdown(
+            f"<h2 style='font-size:36px;text-align:center;'>{term}, c'est {label}</h2>",
+            unsafe_allow_html=True
+        )
+        # Boutons de vote (stockés en privé, sans affichage de stats)
+        col1, col2 = st.columns(2)
+        if col1.button("D'accord 👍"):
+            record_vote(term, 1)
+        if col2.button("Pas d'accord 👎"):
+            record_vote(term, 0)
+    except Exception as e:
+        st.markdown(f"<p style='text-align:center;color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
