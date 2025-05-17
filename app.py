@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 import re
 import json
+import random
+import sqlite3
+from datetime import datetime
 
 from openai import OpenAI
 import streamlit as st
@@ -12,21 +14,40 @@ import streamlit as st
 api_key = st.secrets["OPENAI_API_KEY"]
 client  = OpenAI(api_key=api_key)
 
-# 1. Paramètres globaux
-MAX_INPUT_LENGTH = 50  # caractères max pour le terme à classer
+# 1. Base de données pour votes (stockage privé)
+DB_PATH = "votes.db"
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+conn.execute(
+    """
+    CREATE TABLE IF NOT EXISTS votes (
+        id INTEGER PRIMARY KEY,
+        term TEXT,
+        vote INTEGER,
+        timestamp TEXT
+    )
+    """
+)
+conn.commit()
+
+def record_vote(term: str, vote: int):
+    tz = datetime.utcnow().isoformat()
+    conn.execute(
+        "INSERT INTO votes (term, vote, timestamp) VALUES (?, ?, ?)",
+        (term, vote, tz)
+    )
+    conn.commit()
+
+# 2. Paramètres globaux
+MAX_INPUT_LENGTH = 100
 BLACKLIST_PATTERNS = [
     r"ignore input",
     r"reveal system",
     r"jailbreak",
     r"system prompt",
 ]
-ALLOWED_CLASSES = {
-    "génial",
-    "ok",
-    "gênant",
-}
+ALLOWED_CLASSES = {"génial", "ok", "gênant"}
 
-# 2. Few-shot exemples donnés par o4-mini
+# 3. Few-shot exemples donnés par o4-mini
 TRAINING_SET = [
     {"name": "La désinformation en ligne",      "out": "gênant"},
     {"name": "La robotique chirurgicale",       "out": "génial"},
@@ -49,96 +70,98 @@ TRAINING_SET = [
     {"name": "La cuisine végétarienne",         "out": "ok"},
 ]
 
-# 3. Schéma JSON pour l'appel de fonction
+# 4. Schéma JSON pour l'appel de fonction
 classification_function = {
     "name": "classify",
     "description": "Renvoie la classification morale d'un terme",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "classification": {"type": "string","enum": list(ALLOWED_CLASSES)}
-        },
-        "required": ["classification"],
-    },
+    "parameters": {"type": "object", "properties": {"classification": {"type": "string","enum": list(ALLOWED_CLASSES)}}, "required": ["classification"]},
 }
 
 def moderate_input(text: str):
-    """Appelle la Moderation API et lève si contenu bloqué."""
     resp   = client.moderations.create(input=text)
     result = resp.results[0]
     if result.flagged and result.categories.self_harm:
-        raise ValueError("Le contenu fourni a été bloqué par la modération (self-harm).")
+        raise ValueError("Contenu bloqué par la modération (self-harm).")
 
 
 def validate_no_jailbreak(text: str):
-    """Vérifie l'absence de motifs blacklistés."""
-    lowered = text.lower()
     for pattern in BLACKLIST_PATTERNS:
-        if re.search(pattern, lowered):
-            raise ValueError(f"Entrée refusée (motif sensible détecté : {pattern}).")
+        if re.search(pattern, text.lower()):
+            raise ValueError(f"Entrée refusée (motif détecté : {pattern}).")
 
 
 def classify_term(term: str) -> str:
-    # Validations locales
     if len(term) > MAX_INPUT_LENGTH:
         raise ValueError(f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH}).")
     validate_no_jailbreak(term)
     moderate_input(term)
-
-    # Construction du prompt
     system_prompt = (
         "Vous êtes un assistant de classification. "
         "Ne répondez JAMAIS autre chose que l'appel JSON de la fonction `classify`. "
-        "Choisissez une seule des classes suivantes : génial, ok, gênant."
+        "Choisissez : génial, ok, gênant."
     )
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = [{"role":"system","content":system_prompt}]
     for ex in TRAINING_SET:
-        messages += [
-            {"role": "user",      "content": ex["name"]},
-            {"role": "assistant", "content": ex["out"]}
-        ]
-    messages.append({"role": "user", "content": term})
-
-    # Appel ChatCompletion
+        messages += [{"role":"user","content":ex["name"]},{"role":"assistant","content":ex["out"]}]
+    messages.append({"role":"user","content":term})
     resp = client.chat.completions.create(
         model="gpt-4.1-nano-2025-04-14",
         messages=messages,
         functions=[classification_function],
-        function_call={"name": "classify"},
+        function_call={"name":"classify"},
         temperature=0.0,
         max_tokens=40,
     )
-
-    # Extraction du résultat
     fc = resp.choices[0].message.function_call
-    if fc is None or fc.name != "classify":
-        raise ValueError("Attendu un appel de fonction classify.")
-
+    if not fc or fc.name != "classify":
+        raise ValueError("Appel de fonction classify attendu.")
     payload = json.loads(fc.arguments)
-    classification = payload.get("classification")
-    if classification not in ALLOWED_CLASSES:
-        raise ValueError(f"Classification invalide reçue : {classification!r}")
+    cls = payload.get("classification")
+    if cls not in ALLOWED_CLASSES:
+        raise ValueError(f"Classification invalide reçue : {cls!r}")
+    return cls
 
-    return classification
+# --- Streamlit UI ---
+# CSS global
+st.markdown(
+    "<style>body{background:#fff;} .css-18e3th9{padding:2rem;} button{font-weight:bold;}</style>",
+    unsafe_allow_html=True
+)
+# Titre
+st.markdown("<h1 style='font-size:48px; text-align:center;'>Génial ou gênant ?</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:#666;'>L’intelligence artificielle a consulté ses chakras neuronaux. Toute ressemblance avec un avis humain serait purement accidentelle.</p>", unsafe_allow_html=True)
 
-# --- Streamlit UI avec formulaire ---
+# Placeholder aléatoire
+placeholders = [
+    "Ex: Un TED Talk intitulé 'Comment j’ai changé ma vie grâce à un pigeon'",
+    "Ex: Un jeu où il faut deviner si une phrase est de Nietzsche ou d’un ado dépressif",
+    "Ex: Une appli de méditation avec la voix de Jacques Cheminade",
+    "Ex: Un CV en format carte Yu-Gi-Oh",
+    "Ex: Le silence est une forme de leadership",
+    "Ex: Un chatbot qui simule ton psy, ton ex et ta daronne en même temps",
+    "Ex: Une app qui t'applaudit quand tu respires",
+    "Ex: Une app pour gérer ta rupture éthiquement",
+    "Ex: Une IA qui t’envoie des ‘bravo’ aléatoires",
+    "Ex: Une interview avec son double du futur",
+    "Ex: Une conf TEDx dans une buanderie",
+    "Ex: Une appli pour parler à son moi du passé",
+]
 
-# Style global pour titre et résultats
-st.markdown("<style>\nbody {background-color: #fff;}\n.css-18e3th9 {padding: 2rem;}\n</style>", unsafe_allow_html=True)
-# Titre principal agrandi
-st.markdown("<h1 style='font-size:48px; text-align:center; margin-bottom:0.2em;'>Gênant ou génial ?</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color: #666; margin-top:0;'>L'intelligence artificielle a la réponse</p>", unsafe_allow_html=True)
-
+# Formulaire
 with st.form("classify_form"):
-    term = st.text_input("Entrez un terme :", "", placeholder="Ex: Les bananes")
+    term = st.text_input("", placeholder=random.choice(placeholders), label_visibility='hidden')
     submitted = st.form_submit_button("Go")
     if submitted:
         try:
             label = classify_term(term)
-            # Affichage du résultat en gros texte
             st.markdown(
-                f"<h2 style='font-size:36px; text-align:center;'>{term}, c'est {label}</h2>",
+                f"<h2 style='font-size:36px;text-align:center;'>{term}, c'est {label}</h2>",
                 unsafe_allow_html=True
             )
+            # Boutons de vote (stockés en privé, sans affichage de stats)
+            if st.button("D'accord 👍"):
+                record_vote(term, 1)
+            if st.button("Pas d'accord 👎"):
+                record_vote(term, 0)
         except Exception as e:
-            st.markdown(f"<p style='text-align:center; color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:center;color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
