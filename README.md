@@ -1,4 +1,4 @@
-# Gênant ou génial ?
-Un LLM qui classifie si un énoncé est gênant ou génial. 
+# Génial ou gênant ?
+Un LLM qui classifie si un énoncé est génial ou gênant. 
 
-Testez-le ici : https://genantougenial.streamlit.app/ !
+Testez-le ici : https://genialougenant.streamlit.app/ !
