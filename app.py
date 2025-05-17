@@ -129,8 +129,17 @@ st.markdown(
 )
 # Titre
 st.markdown("<h1 style='font-size:48px; text-align:center;'>Génial ou gênant ?</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#666;'>L’intelligence artificielle a consulté ses chakras neuronaux. " \
-"Toute ressemblance avec un avis humain serait purement accidentelle.</p>", unsafe_allow_html=True)
+st.markdown(
+    "<p style='text-align:center;color:#333; font-size:20px; margin-top:0;'>"
+    "Elle a vu. Elle sait. Elle répond. Voici le jugement de l’intelligence artificielle."
+    "</p>"
+    +
+    "<p style='text-align:center;color:#999; font-size:12px; margin-top:0;'>"
+    "Toute ressemblance avec un avis humain serait purement accidentelle."
+    "</p>",
+    unsafe_allow_html=True
+)
+
 
 # Placeholder aléatoire
 placeholders = [
