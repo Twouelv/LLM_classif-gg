@@ -1,4 +1,3 @@
-```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -190,4 +189,3 @@ if st.session_state.show_result:
     if c2.button("Pas d'accord 👎"):
         record_vote(t, 0)
         st.session_state.show_result = False
-```
