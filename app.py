@@ -70,7 +70,6 @@ def moderate_input(text: str):
     resp   = client.moderations.create(input=text)
     result = resp.results[0]
     if result.flagged:
-        # Le modèle a signalé le contenu; on ne gère que self-harm ici
         if result.categories.self_harm:
             raise ValueError(
                 "Le contenu fourni a été bloqué par la modération (self-harm)."
@@ -119,11 +118,11 @@ def classify_term(term: str) -> str:
 
     # 4. Extraction et validation du retour
     msg = resp.choices[0].message
-    fc  = msg.get("function_call")
-    if not fc or fc.get("name") != "classify":
+    fc  = msg.function_call
+    if fc is None or fc.name != "classify":
         raise ValueError("Le modèle n'a pas renvoyé l'appel de fonction attendu.")
 
-    payload        = json.loads(fc["arguments"])
+    payload        = json.loads(fc.arguments)
     classification = payload.get("classification")
     if classification not in ALLOWED_CLASSES:
         raise ValueError(f"Classification invalide reçue : {classification!r}")
@@ -132,7 +131,7 @@ def classify_term(term: str) -> str:
 
 # --- Streamlit UI ---
 
-st.title("=== Gênant ou pas ? ===")
+st.title(" Gênant ou génial ? ")
 term = st.text_input("Entrez un terme :", "")
 
 if st.button("Classifier"):
