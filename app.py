@@ -5,11 +5,10 @@ import os
 import re
 import json
 import openai
+import streamlit as st
 
 # 0. Configuration
-openai.api_key = os.getenv("OPENAI_API_KEY")
-if openai.api_key is None:
-    raise ValueError("Merci de définir la variable d'environnement OPENAI_API_KEY")
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # 1. Paramètres globaux
 MAX_INPUT_LENGTH = 50  # caractères max pour le terme à classer
@@ -125,14 +124,15 @@ def classify_term(term: str) -> str:
 
     return classification
 
-if __name__ == "__main__":
-    print("=== Gênant ou pas ? ===")
+st.title("=== Gênant ou pas ? ===")
+
+# Zone de saisie
+term = st.text_input("Entrez un terme :", "")
+
+# Bouton pour lancer la classification
+if st.button("Classifier"):
     try:
-        while True:
-            term = input("\nEntrez un terme : ").strip()
-            label = classify_term(term)
-            print(f"{term!r}, c'est {label}")
-    except KeyboardInterrupt:
-        print("\nInterrompu par l'utilisateur.")
+        label = classify_term(term)
+        st.success(f"‘{term}’ est classé comme : **{label}**")
     except Exception as e:
-        print("Erreur :", e)
+        st.error(f"Erreur lors de la classification : {e}")
