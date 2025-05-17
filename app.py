@@ -1,3 +1,4 @@
+```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -10,11 +11,11 @@ from datetime import datetime
 from openai import OpenAI
 import streamlit as st
 
-# 0. Configuration du client
+# --- Configuration client OpenAI ---
 api_key = st.secrets["OPENAI_API_KEY"]
 client  = OpenAI(api_key=api_key)
 
-# 1. Base de données pour votes (stockage privé)
+# --- Base de données votes (privé) ---
 DB_PATH = "votes.db"
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 conn.execute(
@@ -37,8 +38,8 @@ def record_vote(term: str, vote: int):
     )
     conn.commit()
 
-# 2. Paramètres globaux
-MAX_INPUT_LENGTH = 100
+# --- Paramètres globaux ---
+MAX_INPUT_LENGTH = 100  # caractères max pour le terme à classer
 BLACKLIST_PATTERNS = [
     r"ignore input",
     r"reveal system",
@@ -47,7 +48,7 @@ BLACKLIST_PATTERNS = [
 ]
 ALLOWED_CLASSES = {"génial", "ok", "gênant"}
 
-# 3. Few-shot exemples donnés par o4-mini
+# 2. Few-shot exemples donnés par o4-mini
 TRAINING_SET = [
     {"name": "La désinformation en ligne",      "out": "gênant"},
     {"name": "La robotique chirurgicale",       "out": "génial"},
@@ -66,11 +67,11 @@ TRAINING_SET = [
     {"name": "La lecture de romans",            "out": "ok"},
     {"name": "Les chaînes de Ponzi",            "out": "gênant"},
     {"name": "Les énergies renouvelables",      "out": "génial"},
-    {"name": "Le harcèlement scolaire",         "out": "gênant"},
+    {"name": "Une IA qui t’envoie des ‘bravo’ aléatoires",         "out": "gênant"},
     {"name": "La cuisine végétarienne",         "out": "ok"},
 ]
 
-# 4. Schéma JSON pour l'appel de fonction
+# 3. Schéma JSON pour l'appel de fonction
 classification_function = {
     "name": "classify",
     "description": "Renvoie la classification morale d'un terme",
@@ -85,14 +86,15 @@ def moderate_input(text: str):
 
 
 def validate_no_jailbreak(text: str):
+    lowered = text.lower()
     for pattern in BLACKLIST_PATTERNS:
-        if re.search(pattern, text.lower()):
+        if re.search(pattern, lowered):
             raise ValueError(f"Entrée refusée (motif détecté : {pattern}).")
 
 
 def classify_term(term: str) -> str:
     if len(term) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH}).")
+        raise ValueError(f"Terme trop long ({len(term)} > {MAX_INPUT_LENGTH})")
     validate_no_jailbreak(term)
     moderate_input(term)
     system_prompt = (
@@ -102,7 +104,8 @@ def classify_term(term: str) -> str:
     )
     messages = [{"role":"system","content":system_prompt}]
     for ex in TRAINING_SET:
-        messages += [{"role":"user","content":ex["name"]},{"role":"assistant","content":ex["out"]}]
+        messages.append({"role":"user","content":ex["name"]})
+        messages.append({"role":"assistant","content":ex["out"]})
     messages.append({"role":"user","content":term})
     resp = client.chat.completions.create(
         model="gpt-4.1-nano-2025-04-14",
@@ -122,24 +125,25 @@ def classify_term(term: str) -> str:
     return cls
 
 # --- Streamlit UI ---
-# CSS global
+# CSS boutons larges côte à côte
 st.markdown(
-    "<style>body{background:#fff;} .css-18e3th9{padding:2rem;} button{font-weight:bold;}</style>",
+    "<style>"
+    "div.stButton > button { width: 90%; margin: 0 auto; padding: 1rem; font-size: 1rem; }"
+    "</style>",
     unsafe_allow_html=True
 )
-# Titre
+
+# Titre et oraculobot millénaire
 st.markdown("<h1 style='font-size:48px; text-align:center;'>Génial ou gênant ?</h1>", unsafe_allow_html=True)
 st.markdown(
     "<p style='text-align:center;color:#555; font-size:20px; margin-top:0;'>"
     "Elle a vu. Elle sait. Elle répond. Voici le jugement de l’intelligence artificielle."
     "</p>"
-    +
     "<p style='text-align:center;color:#999; font-size:12px; margin-top:0;'>"
     "Toute ressemblance avec un avis humain serait purement accidentelle."
     "</p>",
     unsafe_allow_html=True
 )
-
 
 # Placeholder aléatoire
 placeholders = [
@@ -157,24 +161,33 @@ placeholders = [
     "Ex: Une appli pour parler à son moi du passé",
 ]
 
-# Formulaire
-submitted = False
+# Session state pour afficher/masquer le résultat
+if 'show_result' not in st.session_state:
+    st.session_state.show_result = False
+
+# Formulaire de saisie
 with st.form("classify_form"):
     term = st.text_input("", placeholder=random.choice(placeholders), label_visibility='hidden')
     submitted = st.form_submit_button("Go")
+    if submitted:
+        st.session_state.show_result = True
+        st.session_state.term = term
+        try:
+            st.session_state.label = classify_term(term)
+        except Exception as e:
+            st.error(f"Erreur : {e}")
 
-if submitted:
-    try:
-        label = classify_term(term)
-        st.markdown(
-            f"<h2 style='font-size:36px;text-align:center;'>{term}, c'est {label}</h2>",
-            unsafe_allow_html=True
-        )
-        # Boutons de vote (stockés en privé, sans affichage de stats)
-        col1, col2 = st.columns(2)
-        if col1.button("D'accord 👍"):
-            record_vote(term, 1)
-        if col2.button("Pas d'accord 👎"):
-            record_vote(term, 0)
-    except Exception as e:
-        st.markdown(f"<p style='text-align:center;color:red;'>Erreur : {e}</p>", unsafe_allow_html=True)
+# Résultat et boutons de vote
+if st.session_state.show_result:
+    t = st.session_state.term
+    l = st.session_state.label
+    st.markdown(f"<h2 style='font-size:36px;text-align:center;'>{t}, c'est {l}</h2>", unsafe_allow_html=True)
+    # Colonnes pour boutons
+    c1, c2 = st.columns(2, gap='large')
+    if c1.button("D'accord 👍"):
+        record_vote(t, 1)
+        st.session_state.show_result = False
+    if c2.button("Pas d'accord 👎"):
+        record_vote(t, 0)
+        st.session_state.show_result = False
+```
