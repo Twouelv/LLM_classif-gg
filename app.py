@@ -21,11 +21,12 @@ table   = st.secrets["AIRTABLE"]["TABLE"]
 # --- Base de données votes ---
 at = Airtable(base_id, table, api_key)
 
-def record_vote(term: str, vote: int):
+def record_vote(term: str, vote: int, classification: str):
     # tz = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "term": term,
         "vote": vote,
+        "classification": classification
     #    "timestamp": tz
     }
     at.insert(payload)
@@ -120,7 +121,7 @@ if 'voted' not in st.session_state:
 
 # Callback à l'envoi de la saisie
 def on_submit():
-     st.session_state.term = st.session_state.user_input
+     st.session_state.term = st.session_state.user_input.strip()
      try:
          st.session_state.label = classify_term(st.session_state.user_input)
          st.session_state.show_result = True
@@ -129,14 +130,15 @@ def on_submit():
          st.error(f"Erreur : {e}")
 
 # Champ de saisie avec callback (Enter ou click)
-st.user_input = st.text_input(
-    "Entrez votre terme :", 
+term_input = st.text_input(
+    "Entrez votre terme :",
+    value=st.session_state.get("term", ""),
     placeholder=random.choice(PLACEHOLDERS),
     key="user_input",
-    on_change=on_submit
+    on_change=on_submit                              
 )
 
-# Bouton manuel si préférence
+# Bouton Go (clic déclenche également on_submit)
 if st.button("Go"):
     on_submit()
 
@@ -152,8 +154,8 @@ if st.session_state.show_result:
     c1, c2 = st.columns(2, gap='large')
     if not st.session_state.get('voted', False):
         if c1.button("D'accord 👍"):
-            record_vote(t, 1)
+            record_vote(t, 1, l)
             st.session_state.voted = True
         if c2.button("Pas d'accord 👎"):
-            record_vote(t, 0)
+            record_vote(t, -1, l)
             st.session_state.voted = True

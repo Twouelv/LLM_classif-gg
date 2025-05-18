@@ -28,7 +28,11 @@ py -m venv .venv
 # Windows (cmd)
 py -m venv .venv
 .venv\Scripts\activate.bat
+
+# Pour sortir de l'environnement virtuel
+deactivate
 ```
+
 ```
 
 ### 3. Installer les dépendances
