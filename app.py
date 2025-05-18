@@ -7,6 +7,9 @@ from openai import OpenAI
 import streamlit as st
 from airtable import Airtable
 
+from data_sets import PLACEHOLDERS, TRAINING_SET
+
+
 # --- Configuration ---
 api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
@@ -32,27 +35,7 @@ MAX_INPUT_LENGTH = 100
 BLACKLIST_PATTERNS = [r"ignore input", r"reveal system", r"jailbreak", r"system prompt"]
 ALLOWED_CLASSES = {"génial", "ok", "gênant"}
 # Few-shot exemples donnés par o4-mini
-TRAINING_SET = [
-    {"name": "La désinformation en ligne", "out": "gênant"},
-    {"name": "La robotique chirurgicale", "out": "génial"},
-    {"name": "La randonnée en montagne", "out": "ok"},
-    {"name": "Le bruit urbain", "out": "gênant"},
-    {"name": "Les documentaires scientifiques", "out": "ok"},
-    {"name": "Les voyages interstellaires", "out": "génial"},
-    {"name": "Le recyclage des déchets", "out": "ok"},
-    {"name": "Les spams par e-mail", "out": "gênant"},
-    {"name": "La protection de la vie privée", "out": "génial"},
-    {"name": "Le télétravail", "out": "ok"},
-    {"name": "Les arnaques à la loterie", "out": "gênant"},
-    {"name": "La musique classique", "out": "génial"},
-    {"name": "Le piratage de comptes", "out": "gênant"},
-    {"name": "L’intelligence artificielle", "out": "génial"}, #ça prêche pour sa paroisse
-    {"name": "La lecture de romans", "out": "ok"},
-    {"name": "Les chaînes de Ponzi", "out": "gênant"},
-    {"name": "Les énergies renouvelables", "out": "génial"},
-    {"name": "Le harcèlement scolaire", "out": "gênant"},
-    {"name": "La cuisine végétarienne", "out": "ok"},
-]
+
 # Schéma JSON pour function calling
 classification_function = {
     "name": "classify",
@@ -129,22 +112,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Placeholders
-placeholders = [
-    "Ex: Un TED Talk intitulé 'Comment j’ai changé ma vie grâce à un pigeon'",
-    "Ex: Un jeu où il faut deviner si une phrase est de Nietzsche ou d’un ado dépressif",
-    "Ex: Une appli de méditation avec la voix de Jacques Cheminade",
-    "Ex: Un CV en format carte Yu-Gi-Oh",
-    "Ex: Le silence est une forme de leadership",
-    "Ex: Un chatbot qui simule ton psy, ton ex et ta daronne",
-    "Ex: Une app qui t'applaudit quand tu respires",
-    "Ex: Une app pour gérer ta rupture éthiquement",
-    "Ex: Une IA qui t’envoie des ‘bravo’ aléatoires",
-    "Ex: Une interview avec son double du futur",
-    "Ex: Une conf TEDx dans une buanderie",
-    "Ex: Une appli pour parler à son moi du passé",
-]
-
 # Session state
 if 'show_result' not in st.session_state:
     st.session_state.show_result = False
@@ -164,7 +131,7 @@ def on_submit():
 # Champ de saisie avec callback (Enter ou click)
 st.user_input = st.text_input(
     "Entrez votre terme :", 
-    placeholder=random.choice(placeholders),
+    placeholder=random.choice(PLACEHOLDERS),
     key="user_input",
     on_change=on_submit
 )
