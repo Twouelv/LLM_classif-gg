@@ -2,36 +2,30 @@ import re
 import json
 import random
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from openai import OpenAI
 import streamlit as st
+from airtable import Airtable
 
-# --- Configuration client OpenAI ---
+# --- Configuration ---
 api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
 
-# --- Base de données votes (privé) ---
-DB_PATH = "votes.db"
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-conn.execute(
-    """
-    CREATE TABLE IF NOT EXISTS votes (
-        id INTEGER PRIMARY KEY,
-        term TEXT,
-        vote INTEGER,
-        timestamp TEXT
-    )
-    """
-)
-conn.commit()
+api_key = st.secrets["AIRTABLE"]["API_KEY"]
+base_id = st.secrets["AIRTABLE"]["BASE_ID"]
+table   = st.secrets["AIRTABLE"]["TABLE"]
+
+# --- Base de données votes ---
+at = Airtable(base_id, table, api_key)
 
 def record_vote(term: str, vote: int):
-    tz = datetime.utcnow().isoformat()
-    conn.execute(
-        "INSERT INTO votes (term, vote, timestamp) VALUES (?, ?, ?)",
-        (term, vote, tz)
-    )
-    conn.commit()
+    # tz = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = {
+        "term": term,
+        "vote": vote,
+    #    "timestamp": tz
+    }
+    at.insert(payload)
 
 # --- Paramètres globaux ---
 MAX_INPUT_LENGTH = 100
