@@ -33,7 +33,7 @@ py -m venv .venv
 deactivate
 ```
 
-```
+
 
 ### 3. Installer les dépendances
 
