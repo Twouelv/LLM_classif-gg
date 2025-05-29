@@ -76,4 +76,4 @@ L’interface est alors disponible sur [http://localhost:8501](http://localhost:
 
 ## Déploiement Streamlit Cloud
 
-Les mêmes dépendances et le fichier `secrets.toml` doivent être ajoutés via l’interface **Manage app → Secrets**.
+Les mêmes dépendances et le fichier `secrets.toml` doivent être ajoutés via l’interface **Manage app -> Secrets**.
